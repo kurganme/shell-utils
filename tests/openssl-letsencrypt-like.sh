@@ -2,8 +2,9 @@
 set -ueo pipefail
 
 sd="$(dirname "$(readlink -f "$0")")"
+name=letsencrypt
 
-. "$sd"/../openssl.sh
+. "$sd"/../openssl-utils.sh
 
 cert_days=365 # defaults to 99999
 
@@ -14,8 +15,8 @@ cert_selfsigned_make \
     'keyUsage=critical,keyCertSign,cRLSign' \
     'subjectKeyIdentifier=hash'
 
-echo "$root_cert" > letsencrypt-like-root_cert.pem
-echo "$root_privkey" > letsencrypt-like-root_privkey.pem
+echo "$root_cert" > "$name"-like-root_cert.pem
+echo "$root_privkey" > "$name"-like-root_privkey.pem
 
 cert_make \
     intm_cert intm_privkey \
@@ -26,8 +27,8 @@ cert_make \
     'authorityKeyIdentifier=keyid,issuer' \
     'subjectKeyIdentifier=hash'
 
-echo "$intm_cert" > letsencrypt-like-intm_cert.pem
-echo "$intm_privkey" > letsencrypt-like-intm_privkey.pem
+echo "$intm_cert" > "$name"-like-intm_cert.pem
+echo "$intm_privkey" > "$name"-like-intm_privkey.pem
 
 cert_make \
     leaf_cert leaf_privkey \
@@ -40,8 +41,8 @@ cert_make \
     'authorityKeyIdentifier=keyid,issuer' \
     'subjectAltName=DNS:www.test-site.com, DNS:test-site.com'
 
-echo "$leaf_cert" > letsencrypt-like-leaf_cert.pem
-echo "$leaf_privkey" > letsencrypt-like-leaf_privkey.pem
+echo "$leaf_cert" > "$name"-like-leaf_cert.pem
+echo "$leaf_privkey" > "$name"-like-leaf_privkey.pem
 
 cert_dump() {
     openssl x509 -text -noout -nameopt RFC2253 -certopt no_pubkey,no_sigdump \
@@ -53,6 +54,6 @@ cert_diff() {
 }
 
 for i in root intm leaf; do
-    cert_diff "$sd"/letsencrypt-like-"$i"_cert.pem \
-              "$sd"/letsencrypt-"$i"_cert.pem || true
+    cert_diff "$sd"/"$name"-like-"$i"_cert.pem \
+              "$sd"/"$name"-"$i"_cert.pem || true
 done

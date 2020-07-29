@@ -1,35 +1,38 @@
 #!/bin/sh
 set -ueo pipefail
 
-. "$(dirname "$(readlink -f "$0")")"/openssl.sh
+sd="$(dirname "$(readlink -f "$0")")"
+name=duckduckgo
+
+. "$sd"/../openssl-utils.sh
 
 cert_days=365 # defaults to 99999
 
 cert_selfsigned_make \
-    ca_cert ca_privkey \
+    root_cert root_privkey \
     '/C=US/O=DigiCert Inc/OU=www.digicert.com/CN=DigiCert Global Root CA' \
     'keyUsage=critical,digitalSignature,keyCertSign,cRLSign' \
     'basicConstraints=critical,CA:true' \
     'subjectKeyIdentifier=hash' \
     'authorityKeyIdentifier=keyid,issuer'
 
-echo "$ca_cert" > ca_cert.pem
-echo "$ca_privkey" > ca_privkey.pem
+echo "$root_cert" > "$name"-like-root_cert.pem
+echo "$root_privkey" > "$name"-like-root_privkey.pem
 
 cert_make \
     intm_cert intm_privkey \
-    "$ca_cert" "$ca_privkey" \
+    "$root_cert" "$root_privkey" \
     '/C=US/O=DigiCert Inc/CN=DigiCert SHA2 Secure Server CA' \
     'basicConstraints=critical,CA:true,pathlen:0' \
     'keyUsage=critical,digitalSignature,keyCertSign,cRLSign' \
     'subjectKeyIdentifier=hash' \
     'authorityKeyIdentifier=keyid,issuer'
 
-echo "$intm_cert" > intm_cert.pem
-echo "$intm_privkey" > intm_privkey.pem
+echo "$intm_cert" > "$name"-like-intm_cert.pem
+echo "$intm_privkey" > "$name"-like-intm_privkey.pem
 
 cert_make \
-    web_cert web_privkey \
+    leaf_cert leaf_privkey \
     "$intm_cert" "$intm_privkey" \
     '/C=US/ST=Pennsylvania/L=Paoli/O=Duck Duck Go\, Inc./CN=*.duckduckgo.com' \
     'authorityKeyIdentifier=keyid,issuer' \
@@ -39,5 +42,19 @@ cert_make \
     'extendedKeyUsage=serverAuth,clientAuth' \
     'basicConstraints=critical,CA:false'
 
-echo "$web_cert" > web_cert.pem
-echo "$web_privkey" > web_privkey.pem
+echo "$leaf_cert" > "$name"-like-leaf_cert.pem
+echo "$leaf_privkey" > "$name"-like-leaf_privkey.pem
+
+cert_dump() {
+    openssl x509 -text -noout -nameopt RFC2253 -certopt no_pubkey,no_sigdump \
+            "$@"
+}
+
+cert_diff() {
+    cert_dump -in "$1" | { cert_dump -in "$2" | diff -y - /dev/fd/3; } 3<&0
+}
+
+for i in root intm leaf; do
+    cert_diff "$sd"/"$name"-like-"$i"_cert.pem \
+              "$sd"/"$name"-"$i"_cert.pem || true
+done
