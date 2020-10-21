@@ -1,15 +1,12 @@
 
 users_reset() {
-    local shell="${1:-/bin/ash}"
-    echo 'root:x:0:0:root:/root:'"$shell" >/etc/passwd
-    echo 'root:!::0:::::' >/etc/shadow
-    echo 'root:x:0:root' >/etc/group
-    echo 'root:!::root' >/etc/gshadow
-    chown root:root /etc/passwd /etc/shadow /etc/group /etc/gshadow
-    chmod u=rw,go=r /etc/passwd /etc/group
-    chmod u=rw,g=r,o= /etc/shadow /etc/gshadow
+    # works with alpine:3.12
+    local user_regex="${1:-root}" group_regex="${2:-root|shadow|tty}"
+    sed -Eni '/^('"$user_regex"'):/p' /etc/passwd /etc/shadow
+    sed -Eni '/^('"$group_regex"'):/p' \
+        /etc/group $([ -e /etc/gshadow ] && echo /etc/gshadow)
     if [ -e /etc/default/useradd ]; then
-        sed -i -E 's/^(GROUP=)/#\1/' /etc/default/useradd
+        sed -Ei 's/^(GROUP=)/#\1/' /etc/default/useradd
     fi
 }
 
